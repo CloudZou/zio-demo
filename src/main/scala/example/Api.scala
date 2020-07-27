@@ -1,9 +1,11 @@
 package example
 
+import akka.actor.ActorSystem
+import akka.http.interop.{HttpServer, ZIOSupport}
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.headers.Location
 import akka.http.scaladsl.model._
-import akka.http.scaladsl.server.Directives
+import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.server.Directives._
 import example.application.ApplicationService
 import example.domain._
@@ -12,8 +14,9 @@ import example.interop.akka.{ErrorMapper, ZioSupport}
 import example.layer.Layers
 import example.layer.Layers.AppEnv
 import spray.json._
-import zio.{Runtime, ZLayer}
+import zio.{Has, Runtime, URIO, ZIO, ZLayer}
 import zio.blocking.Blocking
+import zio.config.Config
 import zio.internal.Platform
 
 import scala.concurrent.ExecutionContext
@@ -23,90 +26,44 @@ case class UpdateAssetRequest(name: String, price: BigDecimal)
 case class UpdatePortfolioRequest(assetId: Long, amount: BigDecimal)
 
 trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
-  implicit object AssetIdFormat extends JsonFormat[AssetId] {
-    def write(m: AssetId) = JsNumber(m.value)
-    def read(json: JsValue) = json match {
-      case JsNumber(n) => AssetId(n.longValue())
-      case _ => deserializationError("Number expected")
-    }
-  }
-  implicit val assetFormat = jsonFormat3(Asset)
-  implicit val createAssetRequestFormat = jsonFormat2(CreateAssetRequest)
-  implicit val portfolioStatusFormat = jsonFormat1(PortfolioStatus)
-  implicit val updateAssetRequestFormat = jsonFormat2(UpdateAssetRequest)
-  implicit val updatePortfolioRequestFormat = jsonFormat2(UpdatePortfolioRequest)
   implicit val productFormat = jsonFormat7(Product)
 }
 
-class Api(env: AppEnv, port: Int)(implicit ec: ExecutionContext) extends JsonSupport with ZioSupport {
+object Api {
+  type Api = Has[Api.Service]
 
-  override val environment: Unit = Runtime.default.environment
-
-  override val platform: Platform = Runtime.default.platform
-
-  lazy val route =  productRoute
-
-  implicit val domainErrorMapper = new ErrorMapper[DomainError] {
-    def toHttpResponse(e: DomainError): HttpResponse = e match {
-      case RepositoryError(cause) => HttpResponse(StatusCodes.InternalServerError)
-      case ValidationError(msg)   => HttpResponse(StatusCodes.BadRequest)
-    }
+  trait Service {
+    def routes: Route
   }
+  val live: ZLayer[Config[HttpServer.Config] with Has[ActorSystem] with ProductRepository, Nothing, Api] = ZLayer.fromFunction(env =>
+    new Service with JsonSupport with ZIOSupport {
+      def routes: Route = productRoute
 
-//  val assetRoute =
-//    pathPrefix("assets") {
-//      pathEnd {
-//        get {
-//          complete(ApplicationService.getAssets.provide(env))
-//        } ~
-//        post {
-//          extractScheme { scheme =>
-//            extractHost { host =>
-//              entity(Directives.as[CreateAssetRequest]) { req =>
-//                ApplicationService.addAsset(req.name, req.price).provide(env).map { id =>
-//                  respondWithHeader(Location(Uri(scheme = scheme).withAuthority(host, port).withPath(Uri.Path(s"/assets/${id.value}")))) {
-//                    complete {
-//                      HttpResponse(StatusCodes.Created)
-//                    }
-//                  }
-//                }
-//              }
-//            }
-//          }
-//        }
-//      } ~
-//      path(LongNumber) { assetId =>
-//        put {
-//          entity(Directives.as[UpdateAssetRequest]) { req =>
-//            complete(ApplicationService.updateAsset(AssetId(assetId), req.name, req.price).provide(env).map(_ => JsObject.empty))
-//          }
-//        }
-//      }
-//    }
-//
-//  val portfolioRoute =
-//    pathPrefix("portfolios" / LongNumber) { portfolioId =>
-//      pathEnd {
-//        get {
-//          complete(ApplicationService.getPortfolio(PortfolioId(portfolioId)).provide(env))
-//        }
-//      } ~
-//      path("assets") {
-//        put {
-//          entity(Directives.as[UpdatePortfolioRequest]) { req =>
-//            complete(ApplicationService.updatePortfolio(PortfolioId(portfolioId), AssetId(req.assetId), req.amount).provide(env))
-//          }
-//        }
-//      }
-//    }
-
-  val productRoute =
-    pathPrefix(("product")) {
-      pathEnd {
-        get {
-          complete(ApplicationService.getProducts.provide(env))
+      val productRoute =
+        pathPrefix(("product")) {
+          pathEnd {
+            get {
+              complete(ApplicationService.getProducts.provide(env))
+            }
+          }
         }
-      }
-    }
+    })
 
+  val routes: URIO[Api, Route] = ZIO.access[Api](a => Route.seal(a.get.routes))
 }
+//
+//class Api(env: AppEnv, port: Int)(implicit ec: ExecutionContext) extends JsonSupport with ZioSupport {
+//
+//  override val environment: Unit = Runtime.default.environment
+//
+//  override val platform: Platform = Runtime.default.platform
+//
+//  lazy val route =  productRoute
+//
+//  implicit val domainErrorMapper = new ErrorMapper[DomainError] {
+//    def toHttpResponse(e: DomainError): HttpResponse = e match {
+//      case RepositoryError(cause) => HttpResponse(StatusCodes.InternalServerError)
+//      case ValidationError(msg)   => HttpResponse(StatusCodes.BadRequest)
+//    }
+//  }
+

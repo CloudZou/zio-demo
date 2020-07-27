@@ -6,7 +6,7 @@ ThisBuild / organization     := "com.example"
 ThisBuild / organizationName := "example"
 
 //-XX:MetaspaceSize=
-scalacOptions ++= Seq("-Ypartial-unification", "-deprecation", "-feature", "-Ywarn-unused:imports")
+scalacOptions ++= Seq("-deprecation", "-feature", "-Ywarn-unused:imports")
 
 lazy val root = (project in file("."))
   .settings(
@@ -22,6 +22,9 @@ lazy val root = (project in file("."))
       postgresql,
       postgresqlQuill,
       h2,
+      zioConfig,
+      zioConfigMagnolia,
+      zioConfigTypeSafe,
       pureConfig,
       zioInteropCats,
       zioLogging,

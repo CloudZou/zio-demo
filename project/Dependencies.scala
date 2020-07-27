@@ -31,8 +31,11 @@ object Dependencies {
   lazy val zioInteropCats   = "dev.zio"                  %% "zio-interop-cats"    % "2.0.0.0-RC12"
   lazy val zioLogging       = "dev.zio"                  %% "zio-logging"         % ZIOLoggingVersion
   lazy val zioLoggingSlf4j  = "dev.zio"                  %% "zio-logging-slf4j"   % ZIOLoggingVersion
+  lazy val zioConfig        = "dev.zio"               %% "zio-config"                  % "1.0.0-RC20"
   lazy val flywayDb         = "org.flywaydb"             % "flyway-core"          % "5.2.4"
   lazy val doobieHikari     = "org.tpolecat"             %% "doobie-hikari"       % "0.8.8"
   lazy val zioAkkaHttpInterop = "io.scalac"             %% "zio-akka-http-interop"       % "0.1.0"
+  lazy val zioConfigMagnolia = "dev.zio"               %% "zio-config-magnolia"         % "1.0.0-RC20"
+  lazy val zioConfigTypeSafe = "dev.zio"               %% "zio-config-typesafe"         % "1.0.0-RC20"
 //  lazy val doobiePostgresql = "org.tpolecat" %% "doobie-postgres" % "0.8.8"
 }

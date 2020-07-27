@@ -5,15 +5,18 @@ import akka.http.interop.HttpServer
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.server.Route
 import com.typesafe.config.{Config, ConfigFactory}
+import example.Api.Api
+import example.domain.{DoobieProductRepository, ProductRepository}
 
 import scala.io.StdIn
 import example.layer.Layers.live
-import example.layer.config.ConfigProvider
+import example.layer.config.{AppConfigProvider, ConfigProvider, DbConfigProvider}
 import zio.clock.Clock
 import zio.console.{Console, putStrLn}
 import zio.logging.{LogAnnotation, Logging}
 import zio.logging.slf4j.Slf4jLogger
 import zio._
+import zio.config.typesafe.TypesafeConfig
 import zio.logging.Logging.Logging
 
 object Boot extends zio.App {
@@ -26,14 +29,12 @@ object Boot extends zio.App {
     HttpServer.start.tapM(_ => putStrLn(s"Server online.")).useForever
 
   private def prepareEnvironment(rawConfig: Config): TaskLayer[HttpServer] = {
-
-    // using raw config since it's recommended and the simplest to work with slick
-    val dbConfigLayer = ZLayer.fromEffect(ZIO(rawConfig.getConfig("db")))
-    val dbBackendLayer = ZLayer.succeed(slick.jdbc.H2Profile.backend)
-
+    val configLayer = TypesafeConfig.fromTypesafeConfig(rawConfig, AppConfig.descriptor)
     val actorSystemLayer: TaskLayer[Has[ActorSystem]] = ZLayer.fromManaged {
       ZManaged.make(ZIO(ActorSystem("zio-akka-quickstart-system")))(s => ZIO.fromFuture(_ => s.terminate()).either)
     }
+
+    val apiConfigLayer = configLayer.map(c => Has(c.get.api))
 
     val loggingLayer: ULayer[Logging] = Slf4jLogger.make { (context, message) =>
       val logFormat = "[correlation-id = %s] %s"
@@ -43,16 +44,12 @@ object Boot extends zio.App {
       logFormat.format(correlationId, message)
     }
 
-    val dbLayer: TaskLayer[ItemRepository] =
-      (((dbConfigLayer ++ dbBackendLayer) >>> DatabaseProvider.live) ++ loggingLayer) >>> SlickItemRepository.live
+    val dbLayer: TaskLayer[ProductRepository] = blocking.Blocking.any ++ DbConfigProvider.fromConfig  >>> DoobieProductRepository.layer
 
     val apiLayer: TaskLayer[Api] = (apiConfigLayer ++ dbLayer ++ actorSystemLayer) >>> Api.live
 
-    val graphQLApiLayer: TaskLayer[GraphQLApi] =
-      (dbLayer ++ actorSystemLayer ++ loggingLayer ++ Clock.live) >>> GraphQLApi.live
-
     val routesLayer: ZLayer[Api, Nothing, Has[Route]] =
-      ZLayer.fromServices[Api.Service, , Route]{ (api, gApi) => api.routes ~ gApi.routes }
-    (actorSystemLayer ++ apiConfigLayer ++ (apiLayer  ++ graphQLApiLayer >>> routesLayer)) >>> HttpServer.live
+      ZLayer.fromService[Api.Service, Route](api => api.routes)
+    (actorSystemLayer ++ apiConfigLayer ++ (apiLayer  >>> routesLayer)) >>> HttpServer.live
   }
 }
