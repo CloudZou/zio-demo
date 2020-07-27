@@ -1,7 +1,10 @@
 package example.application
 
 import example.domain._
+import example.layer.Layers.AppEnv
 import zio.ZIO
+
+import scala.concurrent.ExecutionContext
 
 object ApplicationService {
 
@@ -16,8 +19,8 @@ object ApplicationService {
   val getAssets: ZIO[AssetRepository, DomainError, List[Asset]] =
     ZIO.accessM[AssetRepository](_.assetRepository.getAll)
 
-  val getProducts: ZIO[ProductRepository, DomainError, List[Product]] =
-    ZIO.accessM[ProductRepository](_.productRepository.getAll)
+  def getProducts: ZIO[ProductRepository, Throwable, List[Product]] =
+    ZIO.accessM[ProductRepository](_.get.getAll)
 
   def getPortfolio(portfolioId: PortfolioId): ZIO[AssetRepository with PortfolioAssetRepository, DomainError, PortfolioStatus] =
     PortfolioService.calculatePortfolioStatus(portfolioId)

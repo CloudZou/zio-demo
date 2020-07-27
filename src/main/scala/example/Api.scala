@@ -8,10 +8,15 @@ import akka.http.scaladsl.server.Directives._
 import example.application.ApplicationService
 import example.domain._
 import example.infrastructure._
-import example.interop.akka.{ ErrorMapper, ZioSupport }
+import example.interop.akka.{ErrorMapper, ZioSupport}
+import example.layer.Layers
+import example.layer.Layers.AppEnv
 import spray.json._
-import zio.Runtime
+import zio.{Runtime, ZLayer}
+import zio.blocking.Blocking
 import zio.internal.Platform
+
+import scala.concurrent.ExecutionContext
 
 case class CreateAssetRequest(name: String, price: BigDecimal)
 case class UpdateAssetRequest(name: String, price: BigDecimal)
@@ -33,13 +38,13 @@ trait JsonSupport extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val productFormat = jsonFormat7(Product)
 }
 
-class Api(env: SlickAssetRepository with SlickPortfolioAssetRepository with SlickProductRepository, port: Int) extends JsonSupport with ZioSupport {
+class Api(env: AppEnv, port: Int)(implicit ec: ExecutionContext) extends JsonSupport with ZioSupport {
 
   override val environment: Unit = Runtime.default.environment
 
   override val platform: Platform = Runtime.default.platform
 
-  lazy val route = assetRoute ~ portfolioRoute ~ productRoute
+  lazy val route =  productRoute
 
   implicit val domainErrorMapper = new ErrorMapper[DomainError] {
     def toHttpResponse(e: DomainError): HttpResponse = e match {
@@ -48,52 +53,52 @@ class Api(env: SlickAssetRepository with SlickPortfolioAssetRepository with Slic
     }
   }
 
-  val assetRoute =
-    pathPrefix("assets") {
-      pathEnd {
-        get {
-          complete(ApplicationService.getAssets.provide(env))
-        } ~
-        post {
-          extractScheme { scheme =>
-            extractHost { host => 
-              entity(Directives.as[CreateAssetRequest]) { req =>
-                ApplicationService.addAsset(req.name, req.price).provide(env).map { id =>
-                  respondWithHeader(Location(Uri(scheme = scheme).withAuthority(host, port).withPath(Uri.Path(s"/assets/${id.value}")))) {
-                    complete {
-                      HttpResponse(StatusCodes.Created)
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } ~
-      path(LongNumber) { assetId =>
-        put {
-          entity(Directives.as[UpdateAssetRequest]) { req =>
-            complete(ApplicationService.updateAsset(AssetId(assetId), req.name, req.price).provide(env).map(_ => JsObject.empty))
-          }
-        }
-      }
-    }
-
-  val portfolioRoute = 
-    pathPrefix("portfolios" / LongNumber) { portfolioId =>
-      pathEnd {
-        get {
-          complete(ApplicationService.getPortfolio(PortfolioId(portfolioId)).provide(env))
-        }
-      } ~
-      path("assets") {
-        put {
-          entity(Directives.as[UpdatePortfolioRequest]) { req =>
-            complete(ApplicationService.updatePortfolio(PortfolioId(portfolioId), AssetId(req.assetId), req.amount).provide(env))
-          }
-        }
-      } 
-    }
+//  val assetRoute =
+//    pathPrefix("assets") {
+//      pathEnd {
+//        get {
+//          complete(ApplicationService.getAssets.provide(env))
+//        } ~
+//        post {
+//          extractScheme { scheme =>
+//            extractHost { host =>
+//              entity(Directives.as[CreateAssetRequest]) { req =>
+//                ApplicationService.addAsset(req.name, req.price).provide(env).map { id =>
+//                  respondWithHeader(Location(Uri(scheme = scheme).withAuthority(host, port).withPath(Uri.Path(s"/assets/${id.value}")))) {
+//                    complete {
+//                      HttpResponse(StatusCodes.Created)
+//                    }
+//                  }
+//                }
+//              }
+//            }
+//          }
+//        }
+//      } ~
+//      path(LongNumber) { assetId =>
+//        put {
+//          entity(Directives.as[UpdateAssetRequest]) { req =>
+//            complete(ApplicationService.updateAsset(AssetId(assetId), req.name, req.price).provide(env).map(_ => JsObject.empty))
+//          }
+//        }
+//      }
+//    }
+//
+//  val portfolioRoute =
+//    pathPrefix("portfolios" / LongNumber) { portfolioId =>
+//      pathEnd {
+//        get {
+//          complete(ApplicationService.getPortfolio(PortfolioId(portfolioId)).provide(env))
+//        }
+//      } ~
+//      path("assets") {
+//        put {
+//          entity(Directives.as[UpdatePortfolioRequest]) { req =>
+//            complete(ApplicationService.updatePortfolio(PortfolioId(portfolioId), AssetId(req.assetId), req.amount).provide(env))
+//          }
+//        }
+//      }
+//    }
 
   val productRoute =
     pathPrefix(("product")) {
