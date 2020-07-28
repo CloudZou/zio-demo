@@ -4,7 +4,7 @@ import example.domain.{DoobieProductRepository, ProductRepository}
 import example.layer.config.{AppConfigProvider, ConfigProvider, DbConfigProvider}
 import zio.ZLayer
 import zio.blocking.Blocking
-import zio.logging.Logging.Logging
+import zio.logging.Logging
 import zio.logging.slf4j.Slf4jLogger
 
 object Layers {

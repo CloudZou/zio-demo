@@ -1,16 +1,13 @@
 package example.domain
 
 import doobie.hikari._
-import doobie.implicits._
 import org.flywaydb.core.Flyway
 import cats.effect.{Blocker, IO}
-import doobie.util.transactor.Transactor
 import example.layer.config.DBConfig
 import zio.{Managed, Task, ZIO, ZManaged}
 import zio.blocking.Blocking
 import zio.interop.catz._
 
-import scala.concurrent.ExecutionContext
 
 trait DoobieTransactor {
   def initDb(cfg: DBConfig): Task[Unit] =
@@ -19,7 +16,6 @@ trait DoobieTransactor {
         .configure()
         .dataSource(cfg.url, cfg.user, cfg.password)
         .load()
-        .migrate()
     }.unit
 
   def mkTransactor(

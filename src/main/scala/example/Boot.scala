@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Route
 import com.typesafe.config.{Config, ConfigFactory}
 import example.Api.Api
 import example.domain.{DoobieProductRepository, ProductRepository}
+import example.layer.Layers
 
 import scala.io.StdIn
 import example.layer.Layers.live
@@ -17,7 +18,6 @@ import zio.logging.{LogAnnotation, Logging}
 import zio.logging.slf4j.Slf4jLogger
 import zio._
 import zio.config.typesafe.TypesafeConfig
-import zio.logging.Logging.Logging
 
 object Boot extends zio.App {
   def run(args: List[String]): ZIO[zio.ZEnv, Nothing, ExitCode] =
@@ -28,7 +28,7 @@ object Boot extends zio.App {
   private val program: ZIO[HttpServer with Console, Throwable, Unit] =
     HttpServer.start.tapM(_ => putStrLn(s"Server online.")).useForever
 
-  private def prepareEnvironment(rawConfig: Config): TaskLayer[HttpServer] = {
+  private def prepareEnvironment(rawConfig: Config): ZLayer[blocking.Blocking, Throwable, HttpServer] = {
     val configLayer = TypesafeConfig.fromTypesafeConfig(rawConfig, AppConfig.descriptor)
     val actorSystemLayer: TaskLayer[Has[ActorSystem]] = ZLayer.fromManaged {
       ZManaged.make(ZIO(ActorSystem("zio-akka-quickstart-system")))(s => ZIO.fromFuture(_ => s.terminate()).either)
@@ -43,13 +43,11 @@ object Boot extends zio.App {
       )
       logFormat.format(correlationId, message)
     }
-
-    val dbLayer: TaskLayer[ProductRepository] = blocking.Blocking.any ++ DbConfigProvider.fromConfig  >>> DoobieProductRepository.layer
-
-    val apiLayer: TaskLayer[Api] = (apiConfigLayer ++ dbLayer ++ actorSystemLayer) >>> Api.live
+    val apiLayer = (apiConfigLayer ++ live.appLayer ++ actorSystemLayer) >>> Api.live
 
     val routesLayer: ZLayer[Api, Nothing, Has[Route]] =
       ZLayer.fromService[Api.Service, Route](api => api.routes)
+
     (actorSystemLayer ++ apiConfigLayer ++ (apiLayer  >>> routesLayer)) >>> HttpServer.live
   }
 }
