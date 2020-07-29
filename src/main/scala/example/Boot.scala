@@ -34,6 +34,8 @@ object Boot extends zio.App {
       ZManaged.make(ZIO(ActorSystem("zio-akka-quickstart-system")))(s => ZIO.fromFuture(_ => s.terminate()).either)
     }
 
+
+
     val apiConfigLayer = configLayer.map(c => Has(c.get.api))
 
     val loggingLayer: ULayer[Logging] = Slf4jLogger.make { (context, message) =>
@@ -43,7 +45,7 @@ object Boot extends zio.App {
       )
       logFormat.format(correlationId, message)
     }
-    val apiLayer = (apiConfigLayer ++ live.appLayer ++ actorSystemLayer) >>> Api.live
+    val apiLayer = ( live.appLayer ++ actorSystemLayer) >>> Api.live
 
     val routesLayer: ZLayer[Api, Nothing, Has[Route]] =
       ZLayer.fromService[Api.Service, Route](api => api.routes)
