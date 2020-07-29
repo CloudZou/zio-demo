@@ -39,6 +39,8 @@ object Dependencies {
   lazy val zioConfigMagnolia = "dev.zio"               %% "zio-config-magnolia"         % "1.0.0-RC20"
   lazy val zioConfigTypeSafe = "dev.zio"               %% "zio-config-typesafe"         % "1.0.0-RC20"
 
+  lazy val druidDataSource   = "com.alibaba" % "druid" % "1.1.23"
+
   lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.4"
 //  lazy val doobiePostgresql = "org.tpolecat" %% "doobie-postgres" % "0.8.8"
 }

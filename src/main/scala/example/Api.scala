@@ -1,23 +1,13 @@
 package example
 
 import akka.actor.ActorSystem
-import akka.http.interop.{HttpServer, ZIOSupport}
-import akka.http.scaladsl.model.headers.Location
-import akka.http.scaladsl.model._
+import akka.http.interop.ZIOSupport
 import akka.http.scaladsl.server.{Directives, Route}
 import akka.http.scaladsl.server.Directives._
 import example.application.ApplicationService
 import example.domain._
 import example.domain.Product._
-import example.interop.akka.{ErrorMapper, ZioSupport}
-import example.layer.Layers
-import example.layer.Layers.AppEnv
 import zio.{Has, Runtime, URIO, ZIO, ZLayer}
-import zio.blocking.Blocking
-import zio.config.Config
-import zio.internal.Platform
-
-import scala.concurrent.ExecutionContext
 
 import de.heikoseeberger.akkahttpcirce.ErrorAccumulatingCirceSupport._
 

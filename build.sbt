@@ -6,7 +6,7 @@ ThisBuild / organization     := "com.example"
 ThisBuild / organizationName := "example"
 
 //-XX:MetaspaceSize=
-scalacOptions ++= Seq("-deprecation", "-feature", "-Ywarn-unused:imports")
+scalacOptions ++= Seq("-deprecation", "-feature", "-Ywarn-unused:imports", "-language:postfixOps")
 
 lazy val root = (project in file("."))
   .settings(
@@ -19,6 +19,7 @@ lazy val root = (project in file("."))
       circeGeneric,
       akkaHttpCirce,
       postgresql,
+      druidDataSource,
       zio,
       zioIntRS,
       zioConfig,
