@@ -53,7 +53,7 @@ class DefaultJedisConnectionService extends JedisConnectionResource.Service {
 object DefaultJedisConnectionResource {
 
   val live: ZLayer[JedisPoolService, Throwable, JedisConnectionService] =
-    ZLayer.fromService { (t: JedisPoolService) =>
-      new DefaultJedisConnectionService
+    ZLayer.fromEffect {
+      ZIO.effect(new DefaultJedisConnectionService)
     }
 }
