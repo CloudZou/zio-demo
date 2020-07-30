@@ -19,24 +19,6 @@ package object domain {
     for {
       movieOption        <-
         ZIO.accessM[MovieService](_.get.getIMDB(registration.imdbId))
-      screeningScheduled <-
-        ZIO.accessM[MovieService](_.get.contains(registration.screenId))
-      registered         <- if (movieOption.isDefined && screeningScheduled)
-                              ZIO.accessM[MovieService](
-                                _.get.putReservation(
-                                  ReservationRequest(
-                                    registration.imdbId,
-                                    registration.screenId
-                                  ),
-                                  ReservationStatus(
-                                    registration.imdbId,
-                                    registration.screenId,
-                                    movieOption.get.movieTitle,
-                                    registration.availableSeats
-                                  )
-                                )
-                              )
-                            else
-                              ZIO.succeed(false)
-    } yield registered
+      
+    } yield true 
 }
