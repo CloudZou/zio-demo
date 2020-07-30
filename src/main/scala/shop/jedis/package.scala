@@ -12,6 +12,6 @@ package object jedis {
   type JedisAutoClosable       = Resource[IO, Jedis]
 
 
-  val jedisLayer: ZLayer[Any, Throwable, JedisAutoClosable] =
-    DefaultJedisPoolResource.live ++ DefaultJedisConnectionResource.live 
+  val jedisLayer: ZLayer[Has[Any], Throwable, JedisConnectionService] =
+    DefaultJedisPoolResource.live >>> DefaultJedisConnectionResource.live 
 }

@@ -21,10 +21,8 @@ class DefaultJedisPoolService extends JedisPoolResource.Service {
 
 object DefaultJedisPoolResource {
 
-  val live: ZLayer[Has[Any], Throwable, JedisPoolService] =
-    ZLayer.fromService { t: Any =>
-      new DefaultJedisPoolService
-    }
+  val live: ZLayer[Any, Throwable, JedisPoolService] =
+    ZLayer.fromEffect(ZIO.effect(new DefaultJedisPoolService))
 }
 
 object JedisConnectionResource {
