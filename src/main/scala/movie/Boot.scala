@@ -1,5 +1,3 @@
 package movie
 
-class Boot {
-
-}
+class Boot {}

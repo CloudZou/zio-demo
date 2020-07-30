@@ -1,6 +1,6 @@
 package example.layer
 
-import pureconfig.{ConfigConvert, ConfigSource}
+import pureconfig.{ ConfigConvert, ConfigSource }
 import pureconfig.generic.semiauto._
 import zio.Has
 import zio.ZIO
@@ -9,8 +9,8 @@ import zio.ZLayer
 object config {
 
   final case class Config(
-                           appConfig: AppConfig,
-                           dbConfig: DBConfig)
+    appConfig: AppConfig,
+    dbConfig: DBConfig)
 
   object Config {
     implicit val convert: ConfigConvert[Config] = deriveConvert
@@ -24,11 +24,10 @@ object config {
       ZLayer.fromEffect {
         ZIO
           .fromEither(ConfigSource.default.load[Config])
-          .mapError(
-            failures =>
-              new IllegalStateException(
-                s"Error loading configuration: $failures"
-              )
+          .mapError(failures =>
+            new IllegalStateException(
+              s"Error loading configuration: $failures"
+            )
           )
       }
   }
@@ -50,18 +49,18 @@ object config {
   }
 
   final case class AppConfig(
-                              port: Int,
-                              baseUrl: String)
+    port: Int,
+    baseUrl: String)
 
   object AppConfig {
     implicit val convert: ConfigConvert[AppConfig] = deriveConvert
   }
 
   final case class DBConfig(
-                             url: String,
-                             driver: String,
-                             user: String,
-                             password: String)
+    url: String,
+    driver: String,
+    user: String,
+    password: String)
 
   object DBConfig {
     implicit val convert: ConfigConvert[DBConfig] = deriveConvert

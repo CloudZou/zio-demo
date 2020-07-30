@@ -1,12 +1,31 @@
 import Dependencies._
 
-ThisBuild / scalaVersion     := "2.13.2"
-ThisBuild / version          := "0.1.0-SNAPSHOT"
-ThisBuild / organization     := "com.example"
+ThisBuild / scalaVersion := "2.13.2"
+ThisBuild / version := "0.1.0-SNAPSHOT"
+ThisBuild / organization := "com.example"
 ThisBuild / organizationName := "example"
 
 //-XX:MetaspaceSize=
-scalacOptions ++= Seq("-deprecation", "-feature", "-Ywarn-unused:imports", "-language:postfixOps")
+scalacOptions ++= Seq(
+  "-deprecation",
+  "-feature",
+  "-Ywarn-unused:imports",
+  "-language:postfixOps"
+)
+
+addCommandAlias("build", "prepare; test")
+addCommandAlias("prepare", "fix; fmt")
+addCommandAlias("check", "fixCheck; fmtCheck")
+addCommandAlias("fix", "all compile:scalafix test:scalafix")
+addCommandAlias(
+  "fixCheck",
+  "compile:scalafix --check; test:scalafix --check"
+)
+addCommandAlias("fmt", "all scalafmtSbt scalafmt test:scalafmt")
+addCommandAlias(
+  "fmtCheck",
+  "all scalafmtSbtCheck scalafmtCheck test:scalafmtCheck"
+)
 
 lazy val root = (project in file("."))
   .settings(
@@ -36,10 +55,11 @@ lazy val root = (project in file("."))
       doobieQuill,
       logback,
       akkaSlf4j,
-      scalaTest % Test,
+      jedis,
+      scalaTest        % Test,
       scalaTestMockito % Test,
-      akkaTestkit % Test,
-      akkaHttpTestkit % Test
+      akkaTestkit      % Test,
+      akkaHttpTestkit  % Test
     )
   )
 
