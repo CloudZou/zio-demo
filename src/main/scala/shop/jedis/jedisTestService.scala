@@ -1,12 +1,17 @@
 package shop.jedis
 
 import zio.ZIO
+import zio.ZLayer
 
 object jedisTestService {
-    def test: ZIO[JedisConnectionService, Throwable, Int] = {
+    def test: ZIO[JedisPoolService with JedisConnectionService, Throwable, JedisAutoClosable] = {
         for {
-            jedis <- ZIO.accessM[JedisConnectionService](_.get.getJedis)
-            i = 0
-        } yield i
+            jedisPool <- ZIO.accessM[JedisPoolService](_.get.getJedisPool)
+            jedis <- ZIO.accessM[JedisConnectionService](_.get.getJedis(jedisPool))
+        } yield jedis
+    }
+
+    def main(): Unit = {
+        
     }
 }
