@@ -69,8 +69,6 @@ object ProviderService extends BootstrapRuntime{
   val program: ZIO[Console with Has[Jedis], Throwable, Unit] =
     for {
       i <- ZIO.accessM[Has[Jedis]] { p: Has[Jedis] =>
-        //在这里用ZManged的use 似乎当后面运行ZIO.foldLeft在副作用未生效之前就已经占用了resource资源，导致运行的时候，如果list长度大于pool的size后，直接导致从pool里面获取不到resource产生异常了。
-        // 所以ZIO的pool 设计似乎不能这么用。。
         val ret = ZIO.effect{
           val xx = p.get.get("test")
           println(xx)
