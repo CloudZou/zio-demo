@@ -9,9 +9,8 @@ import zio.ZLayer
 package object jedis {
   type JedisPoolService       = Has[JedisPoolResource.Service]
   type JedisConnectionService = Has[JedisConnectionResource.Service]
-  type JedisAutoClosable       = Resource[IO, Jedis]
-
+  type JedisAutoClosable      = Resource[IO, Jedis]
 
   val jedisLayer: ZLayer[Has[Any], Throwable, JedisConnectionService] =
-    DefaultJedisPoolResource.live >>> DefaultJedisConnectionResource.live 
+    DefaultJedisPoolResource.live >>> DefaultJedisConnectionResource.live
 }

@@ -1,21 +1,20 @@
 package wrapper.free
 
 import cats.data.Kleisli
-import cats.effect.{Async, Blocker, ContextShift}
+import cats.effect.{ Async, Blocker, ContextShift }
 import cats.~>
 import redis.clients.jedis.Jedis
 import wrapper.free.connection.ConnectionOp
-
 
 object KleisliInterpreter {
 
   @SuppressWarnings(Array("org.wartremover.warts.DefaultArguments"))
   def apply[M[_]](
-                   b: Blocker
-                 )(implicit
-                   am: Async[M],
-                   cs: ContextShift[M]
-                 ): KleisliInterpreter[M] =
+    b: Blocker
+  )(implicit
+    am: Async[M],
+    cs: ContextShift[M]
+  ): KleisliInterpreter[M] =
     new KleisliInterpreter[M] {
       val asyncM        = am
       val contextShiftM = cs
@@ -44,7 +43,7 @@ trait KleisliInterpreter[M[_]] { outer =>
     new ConnectionInterpreter {}
 
   trait ConnectionInterpreter
-    extends ConnectionOp.Visitor[Kleisli[M, Jedis, *]] {
+      extends ConnectionOp.Visitor[Kleisli[M, Jedis, *]] {
 
     override def get(key: String): Kleisli[M, Jedis, String] =
       primitive(_.get(key))

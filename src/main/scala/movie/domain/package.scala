@@ -17,8 +17,8 @@ package object domain {
     registration: MovieRegistration
   ): ZIO[MovieService, Throwable, Boolean] =
     for {
-      movieOption        <-
+      movieOption <-
         ZIO.accessM[MovieService](_.get.getIMDB(registration.imdbId))
-      
-    } yield true 
+
+    } yield true
 }

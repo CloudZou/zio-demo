@@ -16,7 +16,7 @@ package object repository {
     with ProductPictureRepository
     with SkuRepository
 
-  type OrderAllRepository   = UserInfoRepository
+  type OrderAllRepository = UserInfoRepository
     with UserAddressRepository
     with UserSessionRepository
 }
