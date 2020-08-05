@@ -1,32 +1,49 @@
 package shop.jedis
 
+import cats.effect.{Async, Blocker, ContextShift, Resource}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig
 import redis.clients.jedis.{Jedis, JedisPool}
-import shop.jedis.provider.{JedisConnectionProvider, JedisManaged, JedisPoolProvider}
+import shop.jedis.provider.JedisManaged
 import zio.blocking.Blocking
 import zio.{ExitCode, Has, Managed, URIO, ZIO, ZLayer, ZManaged}
 import zio._
+import zio.interop.catz._
+
+import scala.concurrent.ExecutionContext
 
 object provider {
-  type JedisPoolProvider = Has[JedisPool]
-
-  object JedisPoolProvider {
-    val live: ZLayer[Any, Throwable, JedisPoolProvider] =
-      ZLayer.fromFunction(t => {
-        val c = new GenericObjectPoolConfig()
-        c.setMaxWaitMillis(1000)
-        new JedisPool(c)
-      })
+  object JedisManaged {
+    val layer: ZLayer[Blocking, Throwable, Has[Jedis]] = ZLayer.fromManaged(
+      ZIO.runtime[Blocking].toManaged_.flatMap { implicit rt =>
+        for {
+          transactEC <- Managed.succeed(
+            rt.environment
+              .get[Blocking.Service]
+              .blockingExecutor
+              .asEC
+          )
+          connectEC   = rt.platform.executor.asEC
+          jedisResource <- jedisResource[Task] (
+              new JedisPool,
+              connectEC,
+              Blocker.liftExecutionContext(transactEC)
+            )
+            .toManaged
+        } yield jedisResource
+      }
+    )
   }
 
-  type JedisManaged = Managed[Throwable, Jedis]
-  object JedisConnectionProvider {
-    val live: ZLayer[JedisPoolProvider, Throwable, Has[JedisManaged]] =
-      ZLayer.fromManaged(
-        ZManaged.fromFunction(r => ZManaged.effect(r.get.getResource))
-      )
+  def jedisResource[M[_]](jedisPool: JedisPool, connectEC: ExecutionContext,
+                 blocker: Blocker)(implicit
+           ev: Async[M],
+           cs: ContextShift[M]): Resource[M, Jedis] = {
+    val acquire           = cs.evalOn(connectEC)(ev.delay(jedisPool.getResource))
+    def release(c: Jedis) = blocker.blockOn(ev.delay(c.close()))
+    Resource.make(acquire)(release)
   }
+
 }
 
 object ProviderService extends BootstrapRuntime{
@@ -49,29 +66,27 @@ object ProviderService extends BootstrapRuntime{
     }
     catch { case _: SecurityException => }
 
-  val program: ZIO[Console with Has[JedisManaged], Throwable, Unit] =
+  val program: ZIO[Console with Has[Jedis], Throwable, Unit] =
     for {
-      i <- ZIO.accessM[Has[JedisManaged]] { p: Has[JedisManaged] =>
+      i <- ZIO.accessM[Has[Jedis]] { p: Has[Jedis] =>
         //在这里用ZManged的use 似乎当后面运行ZIO.foldLeft在副作用未生效之前就已经占用了resource资源，导致运行的时候，如果list长度大于pool的size后，直接导致从pool里面获取不到resource产生异常了。
         // 所以ZIO的pool 设计似乎不能这么用。。
-        val s = p.get.use(jedis => ZIO.effect {
-          val ret = jedis.get("test")
-          ret
-        })
-        val list: List[Int] = (1 to 9).toList
-        val kk = ZIO.foldLeft(list)("")( (z, item) => s)
+        val ret = ZIO.effect{
+          val xx = p.get.get("test")
+          println(xx)
+          xx
+        }
+        val list: List[Int] = (1 to 100000).toList
+        val kk = ZIO.foldLeft(list)("")( (z, item) => ret)
         kk
       }
       _ <- putStrLn("xdd")
     } yield ()
 
-  val layer: ZLayer[Blocking, Throwable, Has[JedisManaged]] =
-    JedisPoolProvider.live >>> JedisConnectionProvider.live
-
 
    def run(args: List[String]): ZIO[zio.ZEnv, Nothing, ExitCode] = {
     ZIO(ConfigFactory.load.resolve).flatMap(rawConfig =>
-      program.provideCustomLayer(layer)
+      program.provideCustomLayer(JedisManaged.layer)
     ).exitCode
   }
 }

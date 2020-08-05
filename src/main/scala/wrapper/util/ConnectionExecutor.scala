@@ -24,7 +24,7 @@ object ConnectionExecutor {
       type A = A0
       val kernel = kernel0
       val connect = connect0
-      val interpreter = interpret0
+      val interpret = interpret0
     }
 
   object fromPool{
