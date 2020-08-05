@@ -13,6 +13,14 @@ scalacOptions ++= Seq(
   "-language:postfixOps"
 )
 
+lazy val kindProjectorVersion = "0.11.0"
+
+addCompilerPlugin(
+  ("org.typelevel" %% "kind-projector" % kindProjectorVersion).cross(
+    CrossVersion.full
+  )
+)
+
 addCommandAlias("build", "prepare; test")
 addCommandAlias("prepare", "fix; fmt")
 addCommandAlias("check", "fixCheck; fmtCheck")
