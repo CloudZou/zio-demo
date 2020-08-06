@@ -50,5 +50,7 @@ object Dependencies {
   lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.4"
 
   lazy val jedis = "redis.clients" % "jedis" % "3.3.0"
+
+  lazy val redis4cat = "dev.profunktor" %% "redis4cats-effects" % "0.10.2"
 //  lazy val doobiePostgresql = "org.tpolecat" %% "doobie-postgres" % "0.8.8"
 }
