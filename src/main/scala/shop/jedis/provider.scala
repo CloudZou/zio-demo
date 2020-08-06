@@ -1,12 +1,12 @@
 package shop.jedis
 
-import cats.effect.{ Async, Blocker, ContextShift, Resource }
+import cats.effect.{Async, Blocker, ContextShift, Resource}
 import com.typesafe.config.ConfigFactory
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig
-import redis.clients.jedis.{ Jedis, JedisPool }
-import shop.jedis.provider.JedisManaged
+import redis.clients.jedis.{Jedis, JedisPool}
+import shop.jedis.provider.{JedisManaged, JedisPoolManaged}
 import zio.blocking.Blocking
-import zio.{ ExitCode, Has, Managed, URIO, ZIO, ZLayer, ZManaged }
+import zio.{ExitCode, Has, Managed, URIO, ZIO, ZLayer, ZManaged}
 import zio._
 import zio.interop.catz._
 
@@ -36,6 +36,15 @@ object provider {
     )
   }
 
+
+  object JedisPoolManaged {
+    val jedisPool = new JedisPool
+    val acquire: Resource[Task, Jedis] = Resource.make(Task.effect( jedisPool.getResource))((jedis: Jedis) => Task.effect(jedis.close))
+    val live: ZLayer[Any, Throwable, Has[Resource[Task, Jedis]]] = ZLayer.fromManaged{
+      Managed.effectTotal(acquire)
+    }
+  }
+
   def jedisResource[M[_]](
     jedisPool: JedisPool,
     connectEC: ExecutionContext,
@@ -44,8 +53,14 @@ object provider {
     ev: Async[M],
     cs: ContextShift[M]
   ): Resource[M, Jedis] = {
-    val acquire           = cs.evalOn(connectEC)(ev.delay(jedisPool.getResource))
-    def release(c: Jedis) = blocker.blockOn(ev.delay(c.close()))
+    val acquire           = cs.evalOn(connectEC)(ev.delay {
+      println("get Resource")
+      jedisPool.getResource
+    })
+    def release(c: Jedis) = blocker.blockOn(ev.delay{
+      println("close redis connection")
+      c.close
+    })
     Resource.make(acquire)(release)
   }
 
@@ -72,23 +87,62 @@ object ProviderService extends BootstrapRuntime {
       )
     } catch { case _: SecurityException => }
 
-  val program: ZIO[Console with Has[Jedis], Throwable, Unit] =
+  val program1: ZIO[Console with Has[Jedis], Throwable, Unit] =
     for {
-      i <- ZIO.accessM[Has[Jedis]] { p: Has[Jedis] =>
-             val ret             = ZIO.effect {
-               val xx = p.get.get("test")
-               println(xx)
-               xx
-             }
-             val list: List[Int] = (1 to 100000).toList
-             val kk              = ZIO.foldLeft(list)("")((z, item) => ret)
-             kk
-           }
-      _ <- putStrLn("xdd")
+      i1 <- ZIO.accessM[Has[Jedis]](t => ZIO.effect{
+        println("program1")
+        val s1 = t.get.get("test")
+        println("s1:"+ s1)
+      })
+      _ <- putStrLn("program1 result")
     } yield ()
+
+  val program2: ZIO[Console with Has[Jedis], Throwable, Unit] =
+    for {
+      i1 <- ZIO.accessM[Has[Jedis]](t => ZIO.effect{
+        println("program2")
+        val s2 = t.get.get("test")
+        println("s2:"+ s2)
+      })
+      _ <- putStrLn("program2 result")
+    } yield ()
+
+  val program3: ZIO[Console with Has[Resource[Task, Jedis]], Throwable, Unit] =
+    for {
+      i1 <- ZIO.accessM[Has[Resource[Task, Jedis]]](t => t.get.use{ r =>
+        val s = r.get("test")
+        println(s)
+        Task.effect(s)
+      })
+      _ <- putStrLn("program3 result:" +i1)
+    } yield i1
+
+  val program =  for {
+    fiber1 <- program3.fork
+    fiber2 <- program3.fork
+    fiber3 <- program3.fork
+    fiber4 <- program3.fork
+    fiber5 <- program3.fork
+    fiber6 <- program3.fork
+    fiber7 <- program3.fork
+    fiber8 <- program3.fork
+    fiber9 <- program3.fork
+    fiber10 <- program3.fork
+    _     <- fiber1.join
+    _     <- fiber2.join
+    _     <- fiber3.join
+    _     <- fiber4.join
+    _     <- fiber5.join
+    _     <- fiber6.join
+    _     <- fiber7.join
+    _     <- fiber8.join
+    _     <- fiber9.join
+    _     <- fiber10.join
+  } yield ()
+
 
   def run(args: List[String]): ZIO[zio.ZEnv, Nothing, ExitCode] =
     ZIO(ConfigFactory.load.resolve)
-      .flatMap(rawConfig => program.provideCustomLayer(JedisManaged.layer))
+      .flatMap(rawConfig => program.provideCustomLayer(JedisPoolManaged.live))
       .exitCode
 }
