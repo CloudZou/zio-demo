@@ -63,7 +63,7 @@ lazy val root = (project in file("."))
       doobieQuill,
       logback,
       akkaSlf4j,
-      jedis,
+      lettuce,
       redis4cat,
       scalaTest        % Test,
       scalaTestMockito % Test,
