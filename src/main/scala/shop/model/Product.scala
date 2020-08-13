@@ -20,6 +20,10 @@ case class ProductInfo(
 object ProductInfo {
   implicit val encoder: Encoder[ProductInfo] = deriveEncoder[ProductInfo]
   implicit val decoder: Decoder[ProductInfo] = deriveDecoder[ProductInfo]
+
+  def apply(): ProductInfo ={
+    new ProductInfo(1,1,"x","x","x","x","x",1, ZonedDateTime.now, ZonedDateTime.now)
+  }
 }
 
 case class ProductPicture(

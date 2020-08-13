@@ -2,9 +2,10 @@ package shop.jedis
 
 import cats.effect.{Async, Blocker, ContextShift, Resource}
 import com.typesafe.config.ConfigFactory
-import org.apache.commons.pool2.impl.GenericObjectPoolConfig
-import redis.clients.jedis.{Jedis, JedisPool}
-import shop.jedis.provider.{JedisManaged, JedisPoolManaged}
+import io.lettuce.core.{RedisClient, RedisURI}
+import io.lettuce.core.api.StatefulRedisConnection
+import shop.jedis.provider.RedisManaged
+import shop.jedis.provider.RedisManaged.RedisConnection
 import zio.blocking.Blocking
 import zio.{ExitCode, Has, Managed, URIO, ZIO, ZLayer, ZManaged}
 import zio._
@@ -13,57 +14,12 @@ import zio.interop.catz._
 import scala.concurrent.ExecutionContext
 
 object provider {
-
-  object JedisManaged {
-
-    val layer: ZLayer[Blocking, Throwable, Has[Jedis]] = ZLayer.fromManaged(
-      ZIO.runtime[Blocking].toManaged_.flatMap { implicit rt =>
-        for {
-          transactEC    <- Managed.succeed(
-                             rt.environment
-                               .get[Blocking.Service]
-                               .blockingExecutor
-                               .asEC
-                           )
-          connectEC      = rt.platform.executor.asEC
-          jedisResource <- jedisResource[Task](
-                             new JedisPool,
-                             connectEC,
-                             Blocker.liftExecutionContext(transactEC)
-                           ).toManaged
-        } yield jedisResource
-      }
+  object RedisManaged {
+    type RedisConnection = StatefulRedisConnection[String, String]
+    val layer: ZLayer[Blocking, Throwable, Has[RedisConnection]] = ZLayer.fromManaged(
+      Managed.make(Task.effect( RedisClient.create(RedisURI.create("127.0.0.1", 6379)).connect()))( conn => UIO.succeed(conn.close))
     )
   }
-
-
-  object JedisPoolManaged {
-    val jedisPool = new JedisPool
-    val acquire: Resource[Task, Jedis] = Resource.make(Task.effect( jedisPool.getResource))((jedis: Jedis) => Task.effect(jedis.close))
-    val live: ZLayer[Any, Throwable, Has[Resource[Task, Jedis]]] = ZLayer.fromManaged{
-      Managed.effectTotal(acquire)
-    }
-  }
-
-  def jedisResource[M[_]](
-    jedisPool: JedisPool,
-    connectEC: ExecutionContext,
-    blocker: Blocker
-  )(implicit
-    ev: Async[M],
-    cs: ContextShift[M]
-  ): Resource[M, Jedis] = {
-    val acquire           = cs.evalOn(connectEC)(ev.delay {
-      println("get Resource")
-      jedisPool.getResource
-    })
-    def release(c: Jedis) = blocker.blockOn(ev.delay{
-      println("close redis connection")
-      c.close
-    })
-    Resource.make(acquire)(release)
-  }
-
 }
 
 object ProviderService extends BootstrapRuntime {
@@ -87,36 +43,18 @@ object ProviderService extends BootstrapRuntime {
       )
     } catch { case _: SecurityException => }
 
-  val program1: ZIO[Console with Has[Jedis], Throwable, Unit] =
+  val program3: ZIO[Console with Has[RedisConnection], Throwable, Unit] =
     for {
-      i1 <- ZIO.accessM[Has[Jedis]](t => ZIO.effect{
-        println("program1")
-        val s1 = t.get.get("test")
-        println("s1:"+ s1)
-      })
-      _ <- putStrLn("program1 result")
-    } yield ()
-
-  val program2: ZIO[Console with Has[Jedis], Throwable, Unit] =
-    for {
-      i1 <- ZIO.accessM[Has[Jedis]](t => ZIO.effect{
-        println("program2")
-        val s2 = t.get.get("test")
-        println("s2:"+ s2)
-      })
-      _ <- putStrLn("program2 result")
-    } yield ()
-
-  val program3: ZIO[Console with Has[Resource[Task, Jedis]], Throwable, Unit] =
-    for {
-      i1 <- ZIO.accessM[Has[Resource[Task, Jedis]]](t => t.get.use{ r =>
-        val s = r.get("test")
-        println(s)
-        Task.effect(s)
+      i1 <- ZIO.accessM[Has[RedisConnection]](t => {
+        Task.effect{
+          val s = t.get.sync().get("test")
+          println(s)
+        }
       })
       _ <- putStrLn("program3 result:" +i1)
     } yield i1
-
+//
+//
   val program =  for {
     fiber1 <- program3.fork
     fiber2 <- program3.fork
@@ -143,6 +81,6 @@ object ProviderService extends BootstrapRuntime {
 
   def run(args: List[String]): ZIO[zio.ZEnv, Nothing, ExitCode] =
     ZIO(ConfigFactory.load.resolve)
-      .flatMap(rawConfig => program.provideCustomLayer(JedisPoolManaged.live))
+      .flatMap(_ => program.provideCustomLayer(RedisManaged.layer))
       .exitCode
 }
